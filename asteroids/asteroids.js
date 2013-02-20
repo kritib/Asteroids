@@ -4,7 +4,8 @@ HEIGHT = 600;
 ASTEROID_RADIUS = 15;
 SHIP_RADIUS = 20;
 BULLET_RADIUS = 5;
-MAX_VEL = 5;
+ASTEROID_MAX_VEL = 5;
+SHIP_MAX_VEL = 8;
 FPS = 32;
 
 var Asteroids = (function() {
@@ -55,8 +56,8 @@ var Asteroids = (function() {
     return new Asteroid (
       x,
       y,
-      { x: Math.floor(Math.random() * MAX_VEL * 2) - MAX_VEL,
-        y: Math.floor(Math.random() * MAX_VEL * 2) - MAX_VEL
+      { x: Math.floor(Math.random() * ASTEROID_MAX_VEL * 2) - ASTEROID_MAX_VEL,
+        y: Math.floor(Math.random() * ASTEROID_MAX_VEL * 2) - ASTEROID_MAX_VEL
       },
       game
     )
@@ -72,17 +73,18 @@ var Asteroids = (function() {
 
     that.angle = Math.PI/4;
 
-    // that.direction = {
-    //   x: 0,
-    //   y: 1
-    // };
-
-    // that.accel = {
-    //   x: Math.sin(that.vel.x) * num,
-    //   y:
-    // }
-
     that.speed = 0;
+
+    that.adjustSpeed = function (increment) {
+      that.speed += increment;
+
+      if (that.speed > SHIP_MAX_VEL) {
+        that.speed = SHIP_MAX_VEL;
+      } else if (that.speed < 0) {
+        that.speed = 0;
+      };
+
+    };
 
     that.draw = function (ctx) {
       ctx.fillStyle = "rgb(255,0,0)";
@@ -98,14 +100,6 @@ var Asteroids = (function() {
     that.update = function () {
       that.pos.x += (Math.cos(that.angle) * that.speed);
       that.pos.y += (Math.sin(that.angle) * that.speed);
-
-      // for (var coord in that.pos) {
-      //   if (that.pos[coord] < 0) {
-      //     that.pos[coord] = DIM[coord];
-      //   } else if (that.pos[coord] > DIM[coord]) {
-      //     that.pos[coord] = 0;
-      //   }
-      // }
 
       if (that.pos.x < 0) {
         that.pos.x = WIDTH;
@@ -135,9 +129,8 @@ var Asteroids = (function() {
     };
 
     that.fireBullet = function (game) {
-      var newBullet = new Bullet(that.pos.x, that.pos.y, that.angle, that);
+      var newBullet = new Bullet(that.pos.x, that.pos.y, that.angle, game);
       game.bullets.push(newBullet);
-
     };
 
     // that.changeDirection = function (dx, dy) {
@@ -147,7 +140,7 @@ var Asteroids = (function() {
 
   };
 
-  function Bullet (x, y, angle, ship) {
+  function Bullet (x, y, angle, game) {
     var that = this;
 
     that.pos = {
@@ -155,7 +148,7 @@ var Asteroids = (function() {
       y: y
     };
     that.angle = angle;
-    that.speed = 10;
+    that.speed = 12;
 
     that.draw = function (ctx) {
       ctx.fillStyle = "rgb(0,255,0)";
@@ -170,7 +163,7 @@ var Asteroids = (function() {
 
       if (that.pos.x < 0 || that.pos.y < 0 ||
           that.pos.x > WIDTH || that.pos.y > HEIGHT) {
-        ship.bullets = _.without(ship.bullets, that);
+        game.bullets = _.without(game.bullets, that);
       };
     };
 
@@ -198,10 +191,6 @@ var Asteroids = (function() {
     that.asteroids = [];
     that.ship = new Ship;
     that.bullets = [];
-
-    _.times(10, function() {
-    that.asteroids.push(Asteroid.newRandom(that));
-    });
 
     that.draw = function () {
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
@@ -238,58 +227,49 @@ var Asteroids = (function() {
           if (bullet.hitAsteroid(asteroid)) {
             that.asteroids = _.without(that.asteroids, asteroid);
             that.bullets = _.without(that.bullets, bullet);
-            that.asteroids.push(Asteroid.newRandom(that));
           };
         });
       });
     };
 
+    that.replenishAsteroids = function () {
+      _.times(10 - that.asteroids.length, function() {
+        that.asteroids.push(Asteroid.newRandom(that));
+      });
+    }
+
     that.start = function () {
-      that.bindKeyHandlers();
       that.timerId = setInterval(function () {
+        that.replenishAsteroids();
+        that.pressedKeyHandlers();
         that.update();
         that.draw();
         that.checkCollision();
-        console.log(that.asteroids);
       }, 1000/FPS);
     };
 
-    that.bindKeyHandlers = function() {
+    that.pressedKeyHandlers = function() {
 
-      // var directionMoves = {
-      //   "left": [-0.5, -0.5],
-      //   "right": [0.5, 0.5]
-      // }
+      if (key.isPressed("up")) {
+        that.ship.adjustSpeed(0.25);
+      };
 
-      key("up", function () { that.ship.speed += 1; });
+      if (key.isPressed("down")) {
+        that.ship.adjustSpeed(-0.25);
+      };
 
-      key("down", function () {
-        that.ship.speed -= 1;
-      });
+      if (key.isPressed("left")) {
+        that.ship.angle -= (Math.PI/32);
+      };
 
-      key("left", function () {
-        that.ship.angle -= (Math.PI/8);
-      });
-
-      key("right", function () {
-        that.ship.angle += (Math.PI/8);
-      });
+      if (key.isPressed("right")) {
+        that.ship.angle += (Math.PI/32);
+      };
 
       key("space", function () {
         that.ship.fireBullet(that);
       })
-
-      // _.each(directionMoves, function (v, k) {
-      //   key(k, function () {
-      //   that.ship.changeDirection(v[0], v[1]);
-      //   });
-
-      // });
-
     };
-
-
-
 
 
   };
@@ -307,8 +287,6 @@ $(function () {
   var canvas = document.getElementById('asteroids');
   var ctx = canvas.getContext('2d');
 
-  console.log('here');
   new Asteroids.Game(ctx).start();
-
 
 })
