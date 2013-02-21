@@ -86,8 +86,14 @@ var MC = (function () {
       y: startY
     };
 
-    that.angle = Math.atan((endY - startY)/(endX - startX));
     that.speed = 6;
+
+    var slope = (endY - startY)/(endX - startX);
+    if (slope < 0) {
+      that.angle = Math.atan(slope);
+    } else {
+      that.angle = Math.atan(slope) + Math.PI
+    }
 
     that.draw = function (ctx) {
       ctx.strokeStyle = "rgb(0, 255, 0)";
