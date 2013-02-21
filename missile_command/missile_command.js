@@ -1,5 +1,7 @@
 WIDTH = 500;
 HEIGHT = 600;
+CANNON_BLAST_RADIUS = 30;
+MISSILE_BLAST_RADIUS = 15;
 FPS = 32;
 
 var MC = (function () {
@@ -18,7 +20,7 @@ var MC = (function () {
     }
 
     that.angle = angle;
-    that.speed = 4;
+    that.speed = 1;
 
     that.draw = function (ctx) {
       ctx.strokeStyle = "rgb(255, 0, 0)";
@@ -28,11 +30,38 @@ var MC = (function () {
       ctx.stroke();
     };
 
-    that.update = function () {
+    that.update = function (game) {
       that.currentPos.x += (Math.cos(that.angle) * that.speed);
       that.currentPos.y += (Math.sin(that.angle) * that.speed);
+
+      if (that.currentPos.y > 525) {
+        game.missileExplosions.push(new MissileExplosion(
+                                               that.currentPos.x,
+                                               that.currentPos.y));
+        game.missiles = _.without(game.missiles, that);
+        var baseHit = game.closestBase(that.currentPos.x);
+        if (baseHit) {
+          baseHit.health -= 50;
+        } else {
+          console.log("sadly, we are here");
+          game.endGame();
+        };
+      };
     };
 
+    that.isHit = function (explosion) {
+
+      var distance = Math.sqrt(
+                     Math.pow(explosion.pos.x - that.currentPos.x, 2) +
+                     Math.pow(explosion.pos.y - that.currentPos.y, 2));
+
+      if (distance < explosion.radius) {
+        console.log("missile destroyed!!!");
+        return true;
+      } else {
+        return false;
+      };
+    };
 
   };
 
@@ -49,25 +78,37 @@ var MC = (function () {
 
     that.pos = {
       x: x,
-      y: HEIGHT - 10 };
+      y: 525 };
 
-    that.cannons = 10;
+    that.numCannons = 10;
+
+    that.health = 100;
+
 
     that.draw = function (ctx) {
-      ctx.fillText(that.cannons, that.pos.x, that.pos.y);
-
+      ctx.fillStyle = "rgb(64, 64, 64)";
+      ctx.fillRect (that.pos.x - 20, that.pos.y + 20,
+                    40, 40);
+      ctx.fillStyle = "rgb(255,255,255)";
+      ctx.textAlign = "center";
+      if (that.numCannons == 0) {
+        ctx.fillText("OUT", that.pos.x, that.pos.y + 33);
+      } else {
+        ctx.fillText(that.numCannons, that.pos.x, that.pos.y + 33);
+        ctx.fillText(that.health + "%", that.pos.x, that.pos.y + 50);
+      };
     };
 
     that.update = function () {
+      if (that.health <= 0) {
+        that.numCannons = 0;
 
+      }
     };
 
     that.fireCannon = function(x, y, game) {
-      that.cannons--;
+      that.numCannons--;
       game.firedCannons.push(new Cannon(that.pos.x, that.pos.y, x, y));
-
-
-
     };
 
   };
@@ -86,7 +127,7 @@ var MC = (function () {
       y: startY
     };
 
-    that.speed = 6;
+    that.speed = 8;
 
     var slope = (endY - startY)/(endX - startX);
     if (slope < 0) {
@@ -103,7 +144,7 @@ var MC = (function () {
       ctx.stroke();
     };
 
-    that.update = function () {
+    that.update = function (game) {
       that.currentPos.x += (Math.cos(that.angle) * that.speed);
       that.currentPos.y += (Math.sin(that.angle) * that.speed);
 
@@ -112,35 +153,109 @@ var MC = (function () {
                      Math.pow(that.currentPos.y - endY, 2));
 
       if (distance < 10) {
-        that.explode();
+        game.cannonExplosions.push(new CannonExplosion(endX, endY));
+        game.firedCannons = _.without(game.firedCannons, that);
+      };
+    };
+  };
+
+  function CannonExplosion (x, y) {
+    var that = this;
+
+    that.pos = {
+      x: x,
+      y: y
+    };
+
+    that.radius = 3;
+    that.transparency = 1.0;
+
+    that.draw = function (ctx) {
+      ctx.fillStyle = "rgba(255,102,0," + that.transparency + ")";
+      ctx.beginPath();
+      ctx.arc(that.pos.x, that.pos.y, that.radius, 0, 2*Math.PI, true);
+      ctx.fill();
+    };
+
+    that.update = function (game) {
+      that.radius += 1.5;
+      that.transparency -= 0.05;
+      if (that.radius > CANNON_BLAST_RADIUS) {
+        game.cannonExplosions = _.without(game.cannonExplosions, that);
       };
     };
 
-    that.explode = function () {
-    }
-  }
+  };
+
+  function MissileExplosion (x, y) {
+    var that = this;
+
+    that.pos = {
+      x: x,
+      y: y
+    };
+
+    that.radius = 1;
+    that.transparency = 1.0;
+
+    that.draw = function (ctx) {
+      ctx.fillStyle = "rgba(255,255,255," + that.transparency + ")";
+      ctx.beginPath();
+      ctx.arc(that.pos.x, that.pos.y, that.radius, 0, 2*Math.PI, true);
+      ctx.fill();
+    };
+
+    that.update = function (game) {
+      that.radius += 2;
+      that.transparency -= 0.1;
+      if (that.radius > MISSILE_BLAST_RADIUS) {
+        game.missileExplosions = _.without(game.missileExplosions, that);
+      };
+    };
+
+  };
+
 
   function Game (ctx) {
     var that = this;
 
     that.missiles = [];
 
-    _.times(10, function () {
+    _.times(15, function () {
       that.missiles.push(Missile.newRandom())
     });
 
-    that.bases = [new Base(20),
-                  new Base(WIDTH / 2),
-                  new Base(WIDTH - 30)];
+    that.bases = [new Base(55),
+                  new Base(250),
+                  new Base(445)];
 
     that.firedCannons = [];
+    that.cannonExplosions = [];
+    that.missileExplosions = [];
+    that.score = 0;
 
     that.setupCanvas = function () {
+      var background = new Image();
+      background.onload = function () {
+        that.background = background;
+      }
+      background.src = 'missile_command_img.jpg';
+    };
 
+    that.drawScore = function () {
+      ctx.fillStyle = "rgb(64, 64, 64)";
+      ctx.fillRect (WIDTH - 60, 0, 60, 20);
+      ctx.fillStyle = "rgb(255,255,255)";
+      ctx.textAlign = "left";
+      ctx.font = "10pt sans-serif";
+      ctx.fillText("Score: " + that.score, WIDTH - 58, 13);
     }
+
 
     that.draw = function () {
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      ctx.drawImage(that.background, 0, 0);
+
 
       that.missiles.forEach(function (missile) {
         missile.draw(ctx);
@@ -154,12 +269,22 @@ var MC = (function () {
         firedCannon.draw(ctx);
       });
 
+      that.cannonExplosions.forEach(function (explosion) {
+        explosion.draw(ctx);
+      });
 
-    }
+      that.missileExplosions.forEach(function (explosion) {
+        explosion.draw(ctx);
+      });
+
+      that.drawScore();
+
+    };
 
     that.update = function () {
+
       that.missiles.forEach(function (missile) {
-        missile.update();
+        missile.update(that);
       });
 
       that.bases.forEach(function (base) {
@@ -167,17 +292,74 @@ var MC = (function () {
       });
 
       that.firedCannons.forEach(function (firedCannon) {
-        firedCannon.update();
+        firedCannon.update(that);
       });
-    }
+
+      that.cannonExplosions.forEach(function (explosion) {
+        explosion.update(that);
+      });
+
+      that.missileExplosions.forEach(function (explosion) {
+        explosion.update(that);
+      });
+    };
+
+    that.endGame = function() {
+      clearInterval(that.timerId);
+      alert("Game Over");
+    };
+
+    that.isGameOver = function () {
+      var over = true;
+      that.bases.forEach(function (base) {
+        if (base.health > 0) {
+          over = false;
+        };
+      });
+      return over;
+    };
+
+    that.checkCollision = function() {
+      that.cannonExplosions.forEach(function (explosion) {
+        that.missiles.forEach(function (missile) {
+          if (missile.isHit(explosion)) {
+            that.missileExplosions.push(new MissileExplosion(
+                                                   missile.currentPos.x,
+                                                   missile.currentPos.y));
+            that.missiles = _.without(that.missiles, missile);
+            that.score += 1;
+          };
+        });
+      });
+    };
 
     that.start = function () {
+      that.setupCanvas();
       that.mouseClickHandler();
       that.timerId = setInterval(function () {
         that.update();
         that.draw();
-        // that.checkCollision();
+        that.checkCollision();
+        if (that.isGameOver()) {
+          console.log("here");
+          that.endGame();
+        }
       }, 1000/FPS);
+    };
+
+    that.closestCannon = function (x) {
+      var distance = WIDTH;
+      var closest = null;
+
+      that.bases.forEach(function (base) {
+        if (base.numCannons > 0) {
+          if (Math.abs(base.pos.x - x) < distance) {
+            closest = base;
+            distance = Math.abs(base.pos.x - x);
+          };
+        };
+      })
+      return closest;
     };
 
     that.closestBase = function (x) {
@@ -185,7 +367,7 @@ var MC = (function () {
       var closest = null;
 
       that.bases.forEach(function (base) {
-        if (base.cannons > 0) {
+        if (base.health > 0) {
           if (Math.abs(base.pos.x - x) < distance) {
             closest = base;
             distance = Math.abs(base.pos.x - x);
@@ -198,16 +380,13 @@ var MC = (function () {
 
     that.mouseClickHandler = function () {
       $('canvas').click(function (event) {
-        var base = that.closestBase(event.pageX);
-        base.fireCannon(event.pageX - 13, event.pageY - 13, that);
+        var base = that.closestCannon(event.pageX);
+        if (base) {
+          base.fireCannon(event.pageX - 13, event.pageY - 13, that);
+        };
+      });
 
-
-      })
-
-    }
-
-
-
+    };
 
   };
 
