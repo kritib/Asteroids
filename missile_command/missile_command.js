@@ -28,6 +28,10 @@ var MC = (function () {
       ctx.moveTo(that.startPos.x, that.startPos.y);
       ctx.lineTo(that.currentPos.x, that.currentPos.y);
       ctx.stroke();
+      ctx.fillStyle = "rgb(0,0,0)";
+      ctx.beginPath();
+      ctx.arc(that.currentPos.x, that.currentPos.y, 2, 0, 2*Math.PI, true);
+      ctx.fill();
     };
 
     that.update = function (game) {
@@ -43,7 +47,6 @@ var MC = (function () {
         if (baseHit) {
           baseHit.health -= 50;
         } else {
-          console.log("sadly, we are here");
           game.endGame();
         };
       };
@@ -56,7 +59,6 @@ var MC = (function () {
                      Math.pow(explosion.pos.y - that.currentPos.y, 2));
 
       if (distance < explosion.radius) {
-        console.log("missile destroyed!!!");
         return true;
       } else {
         return false;
@@ -66,10 +68,19 @@ var MC = (function () {
   };
 
   Missile.newRandom = function () {
-    x = Math.floor(Math.random() * WIDTH);
-    angle = (Math.random() * (Math.PI/3)) + (Math.PI/3);
+    var startX = Math.floor(Math.random() * WIDTH);
+    var endX = Math.floor(Math.random() * WIDTH);
 
-    return new Missile (x, angle);
+    var slope = (525 - 0)/(endX - startX);
+    if (slope > 0) {
+      var angle = Math.atan(slope);
+    } else {
+      var angle = Math.atan(slope) + Math.PI;
+    };
+
+    // angle = (Math.random() * (Math.PI/3)) + (Math.PI/3);
+
+    return new Missile (startX, angle);
   };
 
 
@@ -133,8 +144,8 @@ var MC = (function () {
     if (slope < 0) {
       that.angle = Math.atan(slope);
     } else {
-      that.angle = Math.atan(slope) + Math.PI
-    }
+      that.angle = Math.atan(slope) + Math.PI;
+    };
 
     that.draw = function (ctx) {
       ctx.strokeStyle = "rgb(0, 255, 0)";
@@ -221,7 +232,7 @@ var MC = (function () {
 
     that.missiles = [];
 
-    _.times(15, function () {
+    _.times(10, function () {
       that.missiles.push(Missile.newRandom())
     });
 
@@ -341,7 +352,6 @@ var MC = (function () {
         that.draw();
         that.checkCollision();
         if (that.isGameOver()) {
-          console.log("here");
           that.endGame();
         }
       }, 1000/FPS);
